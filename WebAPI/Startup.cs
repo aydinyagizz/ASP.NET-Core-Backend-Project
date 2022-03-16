@@ -10,6 +10,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Core.Utilities.Security.Encyption;
+using Core.Utilities.Security.Jwt;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 
 namespace WebAPI
 {
@@ -26,6 +30,27 @@ namespace WebAPI
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddControllers();
+
+            services.AddCors(options =>
+            {
+                //bu adresten gelen istekleri yanýt ver demek. Talep gelirse izin ver diyoruz.
+                options.AddPolicy("AllowOrigin", builder => builder.WithOrigins("http://localhost:3000"));
+            });
+
+            var tokenOptions = Configuration.GetSection("TokenOptions").Get<TokenOptions>();
+            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+            {
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidIssuer = tokenOptions.Issuer,
+                    ValidAudience = tokenOptions.Audience,
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = SecurityKeyHelper.CreateSecurityKey(tokenOptions.SecurityKey)
+                };
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -36,10 +61,17 @@ namespace WebAPI
                 app.UseDeveloperExceptionPage();
             }
 
+            //bu adresten gelen her türlü talabe izin ver demek.
+            app.UseCors(builder => builder.WithOrigins("http://localhost:3000").AllowAnyHeader());
+
             app.UseHttpsRedirection();
 
             app.UseRouting();
 
+            //anahtar
+            app.UseAuthentication();
+
+            //yetki
             app.UseAuthorization();
 
             app.UseEndpoints(endpoints =>
